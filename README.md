@@ -126,6 +126,7 @@ queued -> running -> completed -> confirmed
 | `POST` | `/api/v1/safeguards/:id/restore` | 恢复有效状态 |
 | `GET/POST` | `/api/v1/coverage-evaluations` | 评估列表与幂等运行 |
 | `GET` | `/api/v1/coverage-evaluations/:id` | 读取不可变评估 |
+| `GET` | `/api/v1/coverage-evaluations/:id/compare/:other_id` | 只读对比同场景两个已完成版本的完整差异 |
 | `POST` | `/api/v1/coverage-evaluations/:id/replay` | 从快照确定性重放并比较 |
 | `POST` | `/api/v1/coverage-evaluations/:id/confirm` | 人工确认 |
 | `POST` | `/api/v1/coverage-evaluations/:id/void` | 作废评估 |

@@ -73,3 +73,70 @@ export interface CoverageEvaluation {
 }
 
 export interface CoverageRunInput { scenario_id: number }
+
+export interface EvaluationVersionSummary {
+  id: number
+  evaluated_at: string
+  algorithm_version: string
+  input_hash: string
+  evaluation_state: CoverageState
+  coverage_score: number
+  risk_rank_before: string
+  risk_rank_after: string
+  evaluated_by_name: string
+}
+
+export type ComparisonChangeType = 'added' | 'removed' | 'changed'
+export type UncoveredPathChangeType = 'added' | 'eliminated'
+
+export interface ComparisonFieldChange {
+  field: string
+  before: string
+  after: string
+}
+
+export interface SafeguardComparisonChange {
+  change_type: ComparisonChangeType
+  safeguard_id: number
+  name: string
+  independence_key: string
+  field_changes?: ComparisonFieldChange[]
+}
+
+export type UncoveredPathReasonCode =
+  | 'protection_lost'
+  | 'protection_added'
+  | 'scenario_changed'
+  | 'algorithm_changed'
+  | 'below_threshold'
+  | 'threshold_reached'
+
+export interface UncoveredPathComparisonChange {
+  change_type: UncoveredPathChangeType
+  path_id: string
+  node_code: string
+  cause: string
+  consequence: string
+  reason_code: UncoveredPathReasonCode | string
+  reason: string
+  before_combined_protection?: number
+  after_combined_protection?: number
+  safeguard_ids?: number[]
+  independence_keys?: string[]
+}
+
+export interface EvaluationComparison {
+  base_id: number
+  compared_id: number
+  base: EvaluationVersionSummary
+  compared: EvaluationVersionSummary
+  score_delta: number
+  uncovered_path_delta: number
+  risk_rank_changed: boolean
+  input_changed: boolean
+  algorithm_changed: boolean
+  safeguard_changes: SafeguardComparisonChange[]
+  path_changes: UncoveredPathComparisonChange[]
+  added_uncovered_paths: UncoveredPathComparisonChange[]
+  eliminated_uncovered_paths: UncoveredPathComparisonChange[]
+}

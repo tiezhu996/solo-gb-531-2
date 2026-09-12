@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CheckCircle2, FileCheck2, GitCompare, LoaderCircle, Network, Play, RefreshCw, XCircle } from 'lucide-vue-next'
 import AppShell from '../components/common/AppShell.vue'
@@ -7,13 +7,14 @@ import PageHeader from '../components/common/PageHeader.vue'
 import RiskBadge from '../components/common/RiskBadge.vue'
 import ScenarioStateTimeline from '../components/common/ScenarioStateTimeline.vue'
 import EvidenceDrawer from '../components/common/EvidenceDrawer.vue'
+import EvaluationComparisonPanel from '../components/coverage/EvaluationComparisonPanel.vue'
 import { useCoverageRun } from '../hooks/useCoverageRun'
 import { useAuth } from '../hooks/useAuth'
 import { useCoverageEvaluationStore } from '../stores/coverage-evaluation'
 import { useDeviationScenarioStore } from '../stores/deviation-scenario'
 import { useSafeguardStore } from '../stores/safeguard'
 import { errorMessage } from '../api/client'
-import { coverageStateLabels } from '../types/enums/coverage-state'
+import { coverageStateLabels, type CoverageState } from '../types/enums/coverage-state'
 import type { CoverageSnapshot, EvaluationExplanation, PathEvidence, ScoringStep } from '../types/coverage-evaluation'
 
 const evaluations = useCoverageEvaluationStore()
@@ -24,11 +25,40 @@ const runner = useCoverageRun()
 const scenarioId = ref<number>()
 const drawer = ref(false)
 const compareId = ref<number>()
+const compareError = ref('')
 const selected = computed(() => evaluations.selected)
 const scenario = computed(() => scenarios.items.find((x) => x.id === selected.value?.scenario_id || x.id === scenarioId.value))
 const scenarioSafeguards = computed(() => safeguards.items.filter((x) => x.target_scenario_id === scenario.value?.id))
-const comparable = computed(() => evaluations.items.filter((x) => x.id !== selected.value?.id && x.scenario_id === selected.value?.scenario_id))
-const comparison = computed(() => evaluations.items.find((x) => x.id === compareId.value))
+const comparableStates: CoverageState[] = ['completed', 'confirmed', 'voided']
+const comparable = computed(() => evaluations.items.filter((x) =>
+  x.id !== selected.value?.id
+  && x.scenario_id === selected.value?.scenario_id
+  && comparableStates.includes(x.evaluation_state),
+))
+
+async function loadComparison(comparedId?: number) {
+  compareError.value = ''
+  if (!selected.value || !comparedId) {
+    evaluations.clearComparison()
+    return
+  }
+  try {
+    await evaluations.compare(selected.value.id, comparedId)
+  } catch (error) {
+    compareError.value = errorMessage(error)
+    ElMessage.error(compareError.value)
+  }
+}
+
+watch(compareId, (id) => { void loadComparison(id) })
+watch(() => evaluations.selectedId, () => {
+  if (compareId.value !== undefined) compareId.value = undefined
+  else evaluations.clearComparison()
+})
+
+function compareOptionLabel(item: { id: number; coverage_score: number; evaluation_state: CoverageState }) {
+  return `#${item.id} · ${Math.round(item.coverage_score)} 分 · ${coverageStateLabels[item.evaluation_state]}`
+}
 
 function parse<T>(value: T | string, fallback: T): T { if (typeof value !== 'string') return value; try { return JSON.parse(value) as T } catch { return fallback } }
 const explanation = computed<EvaluationExplanation>(() => parse(selected.value?.explanation ?? '', { summary: '', paths: [], score_steps: [], deduplicated_safeguards: [], boundary_note: '', reference_time: '' }))
@@ -87,8 +117,13 @@ onMounted(refresh)
           <div class="section-heading"><h2>冻结证据</h2><el-tooltip content="查看完整输入快照"><el-button circle text aria-label="查看输入快照" @click="drawer = true"><FileCheck2 :size="17" /></el-button></el-tooltip></div>
           <dl class="evidence-pairs"><div><dt>场景</dt><dd>{{ scenarioLabel(selected.scenario_id) }}</dd></div><div><dt>保护措施</dt><dd>{{ scenarioSafeguards.length }} 项</dd></div><div><dt>独立性键</dt><dd>{{ new Set(scenarioSafeguards.map((x) => x.independence_key)).size }} 个</dd></div><div><dt>输入哈希</dt><dd><code>{{ selected.input_hash || inputSnapshot.input_hash || '见快照' }}</code></dd></div></dl>
           <div v-if="selected.deduplicated_safeguards?.length" class="dedupe-note"><strong>去重措施</strong><span v-for="item in selected.deduplicated_safeguards" :key="`${item.independence_key}-${item.kept_id}`">{{ item.independence_key }}：保留 #{{ item.kept_id }}，忽略 {{ item.ignored_ids.join(', ') }}</span></div>
-          <div class="compare-tools"><GitCompare :size="16" /><el-select v-model="compareId" placeholder="选择版本对比" clearable><el-option v-for="item in comparable" :key="item.id" :label="`#${item.id} · ${item.coverage_score} 分`" :value="item.id" /></el-select></div>
-          <div v-if="comparison" class="comparison-band"><div><span>覆盖分</span><strong>{{ comparison.coverage_score }} → {{ selected.coverage_score }}</strong></div><div><span>风险级别</span><strong>{{ comparison.risk_rank_after }} → {{ selected.risk_rank_after }}</strong></div></div>
+          <div class="compare-tools"><GitCompare :size="16" /><el-select v-model="compareId" placeholder="选择同场景历史版本对比" clearable><el-option v-for="item in comparable" :key="item.id" :label="compareOptionLabel(item)" :value="item.id" /></el-select></div>
+          <p v-if="selected && !comparable.length" class="compare-hint">同场景暂无其他已完成评估，可在有多个版本后对比版本差异。</p>
+          <EvaluationComparisonPanel
+            :comparison="evaluations.comparison"
+            :loading="evaluations.comparisonLoading"
+            :error="compareError || evaluations.comparisonError"
+          />
           <div v-if="canReview && selected.evaluation_state === 'completed'" class="review-strip"><strong>人工结论</strong><p>确认仅表示已完成离线证据复核，不代表可执行控制。</p><div><el-button type="success" @click="changeState('confirm')"><CheckCircle2 :size="15" />确认评估</el-button><el-button type="danger" plain @click="changeState('void')"><XCircle :size="15" />作废</el-button></div></div>
         </aside>
       </div>

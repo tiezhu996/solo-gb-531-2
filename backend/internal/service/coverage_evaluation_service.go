@@ -306,6 +306,12 @@ func (s *coverageEvaluationService) Compare(
 	id uint,
 	otherID uint,
 ) (dto.EvaluationComparisonResponse, error) {
+	if id == otherID {
+		return dto.EvaluationComparisonResponse{}, util.NewError(
+			http.StatusBadRequest, util.CodeBadRequest,
+			"base and compared evaluation must be different versions",
+		)
+	}
 	base, err := s.evaluations.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -320,18 +326,7 @@ func (s *coverageEvaluationService) Compare(
 		}
 		return dto.EvaluationComparisonResponse{}, util.WrapError(http.StatusInternalServerError, util.CodeInternal, "unable to load compared evaluation", err)
 	}
-	if base.ScenarioID != other.ScenarioID {
-		return dto.EvaluationComparisonResponse{}, util.NewError(http.StatusUnprocessableEntity, util.CodeValidation, "only evaluations of the same scenario can be compared")
-	}
-	baseResponse := dto.NewCoverageEvaluationResponse(base)
-	otherResponse := dto.NewCoverageEvaluationResponse(other)
-	return dto.EvaluationComparisonResponse{
-		BaseID: base.ID, ComparedID: other.ID,
-		ScoreDelta:         other.CoverageScore - base.CoverageScore,
-		UncoveredPathDelta: len(otherResponse.UncoveredPaths) - len(baseResponse.UncoveredPaths),
-		RiskRankChanged:    base.RiskRankAfter != other.RiskRankAfter,
-		InputChanged:       base.InputHash != other.InputHash,
-	}, nil
+	return buildEvaluationComparison(base, other)
 }
 func (s *coverageEvaluationService) recordStateAudit(
 	ctx context.Context,

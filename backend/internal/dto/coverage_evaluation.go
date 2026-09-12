@@ -1,9 +1,11 @@
 package dto
+
 import (
 	"encoding/json"
 	"hazop-safeguard-coverage/backend/internal/model"
 	"time"
 )
+
 type RunCoverageEvaluationRequest struct {
 	ScenarioID uint `json:"scenario_id" binding:"required"`
 }
@@ -77,14 +79,58 @@ type CoverageEvaluationListResponse struct {
 	Page  int                          `json:"page"`
 	Size  int                          `json:"page_size"`
 }
-type EvaluationComparisonResponse struct {
-	BaseID             uint    `json:"base_id"`
-	ComparedID         uint    `json:"compared_id"`
-	ScoreDelta         float64 `json:"score_delta"`
-	UncoveredPathDelta int     `json:"uncovered_path_delta"`
-	RiskRankChanged    bool    `json:"risk_rank_changed"`
-	InputChanged       bool    `json:"input_changed"`
+type EvaluationVersionSummary struct {
+	ID               uint    `json:"id"`
+	EvaluatedAt      string  `json:"evaluated_at"`
+	AlgorithmVersion string  `json:"algorithm_version"`
+	InputHash        string  `json:"input_hash"`
+	EvaluationState  string  `json:"evaluation_state"`
+	CoverageScore    float64 `json:"coverage_score"`
+	RiskRankBefore   string  `json:"risk_rank_before"`
+	RiskRankAfter    string  `json:"risk_rank_after"`
+	EvaluatedByName  string  `json:"evaluated_by_name"`
 }
+type ComparisonFieldChange struct {
+	Field  string `json:"field"`
+	Before string `json:"before"`
+	After  string `json:"after"`
+}
+type SafeguardComparisonChange struct {
+	ChangeType      string                  `json:"change_type"`
+	SafeguardID     uint                    `json:"safeguard_id"`
+	Name            string                  `json:"name"`
+	IndependenceKey string                  `json:"independence_key"`
+	FieldChanges    []ComparisonFieldChange `json:"field_changes,omitempty"`
+}
+type UncoveredPathComparisonChange struct {
+	ChangeType               string   `json:"change_type"`
+	PathID                   string   `json:"path_id"`
+	NodeCode                 string   `json:"node_code"`
+	Cause                    string   `json:"cause"`
+	Consequence              string   `json:"consequence"`
+	ReasonCode               string   `json:"reason_code"`
+	Reason                   string   `json:"reason"`
+	BeforeCombinedProtection *float64 `json:"before_combined_protection,omitempty"`
+	AfterCombinedProtection  *float64 `json:"after_combined_protection,omitempty"`
+	SafeguardIDs             []uint   `json:"safeguard_ids,omitempty"`
+	IndependenceKeys         []string `json:"independence_keys,omitempty"`
+}
+type EvaluationComparisonResponse struct {
+	BaseID              uint                            `json:"base_id"`
+	ComparedID          uint                            `json:"compared_id"`
+	Base                EvaluationVersionSummary        `json:"base"`
+	Compared            EvaluationVersionSummary        `json:"compared"`
+	ScoreDelta          float64                         `json:"score_delta"`
+	UncoveredPathDelta  int                             `json:"uncovered_path_delta"`
+	RiskRankChanged     bool                            `json:"risk_rank_changed"`
+	InputChanged        bool                            `json:"input_changed"`
+	AlgorithmChanged    bool                            `json:"algorithm_changed"`
+	SafeguardChanges    []SafeguardComparisonChange     `json:"safeguard_changes"`
+	PathChanges         []UncoveredPathComparisonChange `json:"path_changes"`
+	AddedUncovered      []UncoveredPathComparisonChange `json:"added_uncovered_paths"`
+	EliminatedUncovered []UncoveredPathComparisonChange `json:"eliminated_uncovered_paths"`
+}
+
 func NewCoverageEvaluationResponse(e model.CoverageEvaluation) CoverageEvaluationResponse {
 	response := CoverageEvaluationResponse{
 		ID: e.ID, ScenarioID: e.ScenarioID, AlgorithmVersion: e.AlgorithmVersion,

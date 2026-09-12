@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig, configDefaults } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
@@ -8,5 +8,8 @@ export default defineConfig({
     proxy: { '/api': 'http://127.0.0.1:19531' },
   },
   build: { chunkSizeWarningLimit: 600 },
-  test: { environment: 'jsdom' },
+  test: {
+    environment: 'jsdom',
+    exclude: [...configDefaults.exclude, '**/._*'],
+  },
 })

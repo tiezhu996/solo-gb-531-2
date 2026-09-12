@@ -1,4 +1,5 @@
 package algorithm
+
 import (
 	"fmt"
 	"hazop-safeguard-coverage/backend/internal/model"
@@ -6,7 +7,9 @@ import (
 	"strings"
 	"time"
 )
+
 const Version = "hazop-cover-v1.0.0"
+
 type Snapshot struct {
 	AlgorithmVersion string              `json:"algorithm_version"`
 	ReferenceTime    time.Time           `json:"reference_time"`
@@ -68,6 +71,7 @@ type GraphPath struct {
 	Cause       string `json:"cause"`
 	Consequence string `json:"consequence"`
 }
+
 func NewSnapshot(node model.ProcessNode, scenario model.DeviationScenario, safeguards []model.Safeguard, reference time.Time) Snapshot {
 	ordered := append([]model.Safeguard(nil), safeguards...)
 	sort.Slice(ordered, func(i, j int) bool {
@@ -106,8 +110,8 @@ func NewSnapshot(node model.ProcessNode, scenario model.DeviationScenario, safeg
 	return snapshot
 }
 func BuildGraph(snapshot Snapshot) Graph {
-	causes := splitStatements(snapshot.Scenario.Cause)
-	consequences := splitStatements(snapshot.Scenario.Consequence)
+	causes := SplitStatements(snapshot.Scenario.Cause)
+	consequences := SplitStatements(snapshot.Scenario.Consequence)
 	graph := Graph{}
 	graph.Nodes = append(graph.Nodes, GraphNode{
 		ID: fmt.Sprintf("node-%d", snapshot.Node.ID), Kind: "process_node", Label: snapshot.Node.NodeCode,
@@ -144,6 +148,10 @@ func BuildGraph(snapshot Snapshot) Graph {
 	}
 	return graph
 }
+func SplitStatements(value string) []string {
+	return splitStatements(value)
+}
+
 func splitStatements(value string) []string {
 	parts := strings.FieldsFunc(value, func(r rune) bool {
 		return r == ';' || r == '\n' || r == '|' || r == '。'
